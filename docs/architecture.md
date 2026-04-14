@@ -66,9 +66,10 @@ Value(
   data: complex,
   grad: complex,
   requires_grad: bool,
-  _prev: set[Value],
+  _prev: tuple[Value, ...],
   _op: str,
-  _backward: callable,
+  _eml_x: Value | None,
+  _eml_y: Value | None,
 )
 ```
 
@@ -77,7 +78,8 @@ Notes:
 - `data` is complex from day one
 - real inputs are stored as complex numbers with zero imaginary part
 - literal constants introduced during EML lowering are cached non-gradient leaves
-- `_prev`, `_op`, and `_backward` should look familiar to anyone who has read `micrograd`
+- `_prev` and `_op` should still look familiar to anyone who has read `micrograd`
+- because the only primitive node is `eml`, each non-leaf only needs to remember its primitive operands rather than a per-node Python closure
 - `label` can be added for debugging, but only if it stays lightweight
 
 ## Primitive Operation
@@ -158,7 +160,7 @@ The backward pass should stay close to `micrograd`:
 1. build a topological ordering from the output node
 2. seed `out.grad = 1`
 3. traverse the graph in reverse topological order
-4. call each node's `_backward`
+4. apply the single `eml` local derivative rule to each primitive node
 
 The implementation uses an explicit stack rather than recursive DFS, because EML lowerings create much deeper scalar graphs than the original `micrograd` arithmetic.
 

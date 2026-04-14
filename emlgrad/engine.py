@@ -40,14 +40,18 @@ class Value:
     def _zero(cls):
         return cls._graph_const(
             "zero",
-            lambda: cls._const(1).eml(cls._const(1).eml(cls._const(1)).eml(cls._const(1))),
+            lambda: cls._const(1).eml(
+                cls._const(1).eml(cls._const(1)).eml(cls._const(1))
+            ),
         )
 
     @classmethod
     def _log_zero(cls):
         return cls._graph_const(
             "log_zero",
-            lambda: cls._const(1).eml(cls._const(1).eml(cls._zero()).eml(cls._const(1))),
+            lambda: cls._const(1).eml(
+                cls._const(1).eml(cls._zero()).eml(cls._const(1))
+            ),
         )
 
     @classmethod
@@ -63,13 +67,17 @@ class Value:
     def _log_two(cls):
         return cls._graph_const(
             "log_two",
-            lambda: cls._const(1).eml(cls._const(1).eml(cls._const(2)).eml(cls._const(1))),
+            lambda: cls._const(1).eml(
+                cls._const(1).eml(cls._const(2)).eml(cls._const(1))
+            ),
         )
 
     def eml(self, other):
         other = other if isinstance(other, Value) else self._const(other)
         if self.requires_grad:
-            parents = (self,) if self is other or not other.requires_grad else (self, other)
+            parents = (
+                (self,) if self is other or not other.requires_grad else (self, other)
+            )
         elif other.requires_grad:
             parents = (other,)
         else:

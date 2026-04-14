@@ -5,7 +5,7 @@ import math
 class Value:
     """stores a single scalar value and its gradient"""
 
-    __slots__ = ("data", "grad", "requires_grad", "_backward", "_prev", "_op")
+    __slots__ = ("data", "grad", "requires_grad", "_prev", "_op", "_eml_x", "_eml_y")
 
     _CONST_CACHE = {}
     _GRAPH_CONST_CACHE = {}
@@ -14,10 +14,10 @@ class Value:
         self.data = complex(data)
         self.grad = 0j
         self.requires_grad = requires_grad
-        # internal variables used for autograd graph construction
-        self._backward = lambda: None
         self._prev = tuple(_children)
         self._op = _op
+        self._eml_x = None
+        self._eml_y = None
 
     @classmethod
     def _const(cls, data):
@@ -89,18 +89,8 @@ class Value:
             "eml",
             requires_grad=bool(parents),
         )
-
-        def _backward():
-            # d/dx eml(x, y) = exp(x), d/dy eml(x, y) = -1 / y.
-            if self.requires_grad:
-                self.grad += cmath.exp(self.data) * out.grad
-            if other.requires_grad:
-                if other.data == 0:
-                    other.grad += complex(float("nan"), float("nan"))
-                else:
-                    other.grad += (-1 / other.data) * out.grad
-
-        out._backward = _backward
+        out._eml_x = self
+        out._eml_y = other
         return out
 
     def exp(self):
@@ -246,10 +236,29 @@ class Value:
                 if child not in visited:
                     stack.append((child, False))
 
+        # Each backward pass should start with fresh intermediate state.
+        # Leaves keep accumulated grads, mirroring micrograd-style training loops.
+        for node in topo:
+            if node._prev:
+                node.grad = 0j
+
         # go one variable at a time and apply the chain rule to get its gradient
-        self.grad = 1 + 0j
+        self.grad += 1 + 0j
         for v in reversed(topo):
-            v._backward()
+            if v._op != "eml":
+                continue
+
+            x = v._eml_x
+            y = v._eml_y
+
+            # d/dx eml(x, y) = exp(x), d/dy eml(x, y) = -1 / y.
+            if x.requires_grad:
+                x.grad += cmath.exp(x.data) * v.grad
+            if y.requires_grad:
+                if y.data == 0:
+                    y.grad += complex(float("nan"), float("nan"))
+                else:
+                    y.grad += (-1 / y.data) * v.grad
 
     def __repr__(self):
         return f"Value(data={self.data}, grad={self.grad})"

@@ -278,6 +278,26 @@ class ValueTests(unittest.TestCase):
         self.assertTrue(math.isfinite(x.grad.real))
         self.assertTrue(math.isfinite(x.grad.imag))
 
+    def test_backward_reuses_shared_intermediate_without_stale_grads(self) -> None:
+        x = Value(3.0)
+        y = x * 2
+
+        (y * 3).backward()
+        self.assertComplexAlmostEqual(x.grad, 6 + 0j)
+
+        (y * 4).backward()
+        self.assertComplexAlmostEqual(x.grad, 14 + 0j)
+
+    def test_backward_accumulates_when_reusing_same_output(self) -> None:
+        x = Value(3.0)
+        out = x * 2
+
+        out.backward()
+        self.assertComplexAlmostEqual(x.grad, 2 + 0j)
+
+        out.backward()
+        self.assertComplexAlmostEqual(x.grad, 4 + 0j)
+
 
 if __name__ == "__main__":
     unittest.main()
